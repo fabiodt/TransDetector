@@ -10,33 +10,34 @@ public class GoogleAPI {
 	// search returns TRUE if the query dosn't get any result, so it is a random name
 	public static boolean search(String query) throws IOException {
 		URL url;
+		
 		try {
-		url = new URL(address + query);
+			url = new URL(address + query);
+			BufferedReader in = new BufferedReader(new InputStreamReader(url.openStream()));
+			
+			String str;
+			
+			while ((str = in.readLine()) != null) {
+				
+				Results rs ;
+				rs = new Results(str);
+				
+				if ( rs.exist() )
+				{
+					return false;
+				}
+				else
+				{
+					return true;
+				}
+			}
+			
+			in.close();
 		}
 		catch (Exception e) {
+			System.err.println("Internet connection error");
 			return false;
-		};
-		
-		
-		BufferedReader in = new BufferedReader(new InputStreamReader(url.openStream()));
-		String str;
-		
-		while ((str = in.readLine()) != null) {
-			
-			Results rs ;
-			rs = new Results(str);
-			
-			if ( rs.exist() )
-			{
-				return false;
-			}
-			else
-			{
-				return true;
-			}
 		}
-		
-		in.close();
 		
 		return false;
 	}

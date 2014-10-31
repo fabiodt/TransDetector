@@ -11,13 +11,28 @@ public class Parser {
 		int nrLine;
 		this.variables = new Vector<Variable>();
 		strings = new Vector<Variable>();
+		functions = new Vector<Function>();
 		Vector<Integer> braces = new Vector<Integer>();
 		int startBrace = 0;
 		int endBrace = 0;
 		
+		//Pattern pFun = Pattern.compile("function {1,}\\w{1,}(.{0,})");
+		String pattern = "function {0,}(\\w{1,}) {0,}\\(.{0,}\\)";
+		Pattern pFun = Pattern.compile(pattern);
+
+		
 		// All the code lines are analyzed. Every time a '}' is found, it's analyzed its  
 		// scope in searching for variables declarations. 
 		for ( i=0, nrLine=1; i<this.lines.size(); i++, nrLine++ ) {
+			Matcher mFun = pFun.matcher(this.lines.elementAt(i));
+			if ( mFun.find() ) {
+				variables.addElement( new Variable(mFun.group(1), i+1 ) );
+				variables.lastElement().addType("function");
+				
+				functions.addElement( new Function(lines, mFun.group(1), i) );
+				//function.lastElement().stampCode();
+				//function.lastElement().stampReturn();
+			}
 					
 			if ( this.lines.elementAt(i).contains("{") )
 			{
@@ -31,7 +46,7 @@ public class Parser {
 				// Remember that startBrace and endBrace point to the lines starting by 1, not 0!!
 				// analyze will parse the 
 				analyze(this.lines, startBrace,endBrace,variables);
-				analyzeType(this.lines, startBrace,endBrace,variables);
+				
 				
 	
 			}
@@ -41,17 +56,17 @@ public class Parser {
 		// The last "analyze" calling will consider all the variables that are outside
         // a {scope}
         analyze(this.lines, 0, this.lines.size(), variables);
-        analyzeType(this.lines, startBrace,endBrace, variables);
 		
-		// Filling the "strings" Vector
+		// Filling the "strings"  Vector
 		for ( i=0; i<variables.size(); i++ ) {
 			if ( variables.elementAt(i).type() != null ) {
 				if ( variables.elementAt(i).type().equals("String")  ) {
 						strings.addElement( variables.elementAt(i) );
 				}
 			}
-			
 		}
+		
+
 		
 	}
 	
@@ -75,6 +90,7 @@ public class Parser {
 			System.out.println( strings.elementAt(i).name()+" = "+strings.elementAt(i).stringValue() );
 		}
 	}
+
 	
 	public int size() {
 		return variables.size();
@@ -87,13 +103,18 @@ public class Parser {
 	public Vector<Variable> getStrings() {
 		return strings;
 	}
-	
+
+	public Vector<Function> getFunctions() {
+		return functions;
+	}
+
 	
 	
 	
 	
 	
 	private Vector<Variable> variables;
+	private Vector<Function> functions;
 	private Vector<String> lines;
 	private Vector<Variable> strings;
 	private static void analyze(Vector<String> lines, int startBrace, int endBrace, Vector<Variable> variables ) {
@@ -143,7 +164,7 @@ public class Parser {
 			} // end if braceFound
 		} // end for k
 		
-		
+		analyzeType(lines, startBrace,endBrace,variables);
 	} // end Analyze
 	
 	// The algorithm has been studied to recognize only string literals and save their value.

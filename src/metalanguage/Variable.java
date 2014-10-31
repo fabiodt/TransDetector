@@ -11,6 +11,17 @@ public class Variable {
 		this.values = new Vector<Integer>();
 		this.type = null;
 		this.uses = new Vector<Integer>();
+		this.strValue = null;
+	}
+	public Variable(String name, int nrLine ) {
+		this.name = name;
+		this.nrLine = nrLine;
+		this.startBrace = 0;
+		this.endBrace = 0;
+		this.values = null;
+		this.type = null;
+		this.uses = new Vector<Integer>();
+		this.strValue = null;
 	}
 	
 	

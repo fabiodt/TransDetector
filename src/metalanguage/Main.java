@@ -14,7 +14,10 @@ public class Main {
 		try {
 			Vector<String> lines = Utils.readFileToVector(fileName);
 			Parser variables = new Parser(lines);
-
+			
+			Vector<Function> functions = new Vector<Function>();
+			functions = variables.getFunctions();
+			
 			transcriptaseIndex = 0;
 			
 			// Instruction Permutation 
@@ -45,7 +48,7 @@ public class Main {
 			}
 			
 			// Function Insertion
-			if ( functionInsertion( lines ) ) {
+			if ( functionInsertion( functions ) ) { //lines ) ) {
 				System.out.println("Function Insertion: FOUND");
 				transcriptaseIndex++;
 			}
@@ -85,7 +88,9 @@ public class Main {
 		
 		Vector<Variable> strings = variables.getStrings();
 		
-		String pattern = "\\W\\d{1,}\\W\\d{1,}\\W((\\d{1,}\\W)?){1,}";
+		//String pattern = "\\W\\d{1,}\\W\\d{1,}\\W((\\d{1,}\\W)?){1,}";
+		String pattern = "\\W\\d{1,}\\W((\\d{1,}\\W)?){0,}";
+		
 		
 		Pattern p = Pattern.compile(pattern);
 		
@@ -142,22 +147,25 @@ public class Main {
 	    }
 		
 		for ( i=0; i<nrAnalyzedVar; i++ ) {
-                    if ( variables.size() > 0 ) {
-			int randomIndex = randomGenerator.nextInt(variables.size());
-			
-			if ( variables.elementAt(i).name().length() >= minVarLength )
-			{
-				if (GoogleAPI.search(variables.elementAt(randomIndex).name()) ) {
-					nameRandomization++;
-					if ( i<(nrAnalyzedVar-1) ) {
-						GoogleAPI.waitfor();
+			if ( variables.size() > 0 ) {
+				int randomIndex = randomGenerator.nextInt(variables.size());
+				
+				if ( variables.elementAt(i).name().length() >= minVarLength )
+				{
+					if (GoogleAPI.search(variables.elementAt(randomIndex).name()) ) {
+						nameRandomization++;
+						if ( i<(nrAnalyzedVar-1) ) {
+							GoogleAPI.waitfor();
+						}
 					}
 				}
-			}
-                    }
-                    else {
-                        break;
-                    }
+				else {
+					break;
+				}
+            }
+            else {
+            	break;
+            }
 				
 		}
 		
@@ -173,6 +181,8 @@ public class Main {
 	public static boolean metaLanguageSymbols ( Parser variables ) {
 		int i;
 		Vector<Variable> strings = variables.getStrings();
+		int minimumNrOfML = 2; // The minimum number of pattern found in a string to consider it meta-language
+		int count;
 		/*
 		 * Pattern explanation:
 		 * ([^\\s\\w])		The first character must be a symbol, neither a whitespace, nor a letter/digit 
@@ -184,19 +194,24 @@ public class Main {
 		String pattern = "([^\\s\\w])(.)[\\w]{1,}(\\2)(\\1)";
 		Pattern p = Pattern.compile(pattern);
 		
-		for ( i=0; i<strings.size(); i++ ) {
+		for ( i=0, count=0; i<strings.size(); i++ ) {
 			Matcher m = p.matcher( strings.elementAt(i).stringValue() );
 			while ( m.find() ) {
 				//System.out.println("Meta Language Symbol: ."+m.group()+"." );
-				return true;
+				count++;
+				if ( count >= minimumNrOfML ) {
+					return true;
+				}
+				
 			}
+			count=0;
 		}
 		return false;
 		
 	}
 
 	
-	public static boolean functionInsertion ( Vector<String> lines ) {
+	public static boolean functionInsertion ( Vector<Function> functions ) {//Vector<String> lines ) {
 
 		int i,j;
 		int nrBraces;
@@ -209,100 +224,55 @@ public class Main {
 		
 		String minOperators = "3"; // Minimum number of operators in the definition of the return value to consider it a fake
 		
-		String pattern = "function {1,}\\w{1,}(.{0,})";
-		//String patternIn = "{";
-		Pattern pFun = Pattern.compile(pattern);
 		
+		// The "pOp" pattern will search for minOperators operators within the return value.
+		// It is obviously possible to integrate pOp within pVal, but due to the complexity 
+		// I preferred to keep them separated. 
+		Pattern pOp = Pattern.compile("(([^\\*\\+\\-\\%]{1,}\\*[^\\*\\+\\-\\%]{0,})"
+										+"|([^\\*\\+\\-\\%]{0,}\\+[^\\*\\+\\-\\%]{0,})"
+										+"|([^\\*\\+\\-\\%]{0,}\\-[^\\*\\+\\-\\%]{0,})"
+										+"|([^\\*\\+\\-\\%]{0,}\\%[^\\*\\+\\-\\%]{0,})){"
+										+minOperators+",}"); // adding [;\\n]
 		
-		nrBraces=0;
-		countReturns = 0;
-		firstBrace = true;
-		for ( i=0; i<lines.size(); i++ ) {
-			Matcher m = pFun.matcher( lines.elementAt(i) );
-			if ( m.find() ) {
-				j=i;
-				// The while will analyze the scope of the function, save the position of the start and end brackets
-				// and save in retVar the name of the returning function
-				while ( j<lines.size() ) {
-					if ( lines.elementAt(j).contains("{") ) {
-						if ( firstBrace == true ) {
-							startBrace = j;
-						}
-						nrBraces++;
-						firstBrace = false;
-						// If the first brace is already been caught (firstBrace=false),
-						// the algorithm will exit as soon the nrBraces returns to 0
-					} else 	if ( lines.elementAt(j).contains("}") ) {
-						nrBraces--;
-					}
+		Vector<String> code = new Vector<String>();
+		for ( i=0; i<functions.size(); i++ ) {
+			if ( functions.elementAt(i).getReturn().size() > 1 || functions.elementAt(i).getReturn().size() == 0) {
+				continue;
+			}
+			if ( functions.elementAt(i).getReturn().elementAt(0).equals("null")) {
+				continue;
+			}
+			code = functions.elementAt(i).getCode();
+			for ( j=0; j<code.size(); j++ ) {
+				
+				Pattern pVal = Pattern.compile(functions.elementAt(i).getReturn().elementAt(0)+" {0,}={1} {0,}(.{1,})[;\\n]");
+				Matcher mVal = pVal.matcher(code.elementAt(j));
+				if ( mVal.find() ) {
+					//System.out.println( "Operation: "+mVal.group(1) );
 					
-					if ( (nrBraces == 0)  &&  (firstBrace == false) ) {
-						lastBrace = j;
-						i = j; // it jumps the function 
-						firstBrace = true;
-						break;
+					// pOp selected a specific number of algebraic operators
+					Matcher mOp = pOp.matcher(mVal.group(1));
+					if ( mOp.find() ) {
+						return true;
 					}
-					else {
-						// we are within the function yet, we have to analyze the function content
-						// row by row
-						Pattern pRet = Pattern.compile("return {1,}(\\w{1,})[;\\n]");
-						Matcher mRet = pRet.matcher(lines.elementAt(j) );
-						if ( mRet.find() ) {
-							countReturns++;
-							returnVar = mRet.group(1);
-							//System.out.println("return: "+returnVar);
-							// if it's return 3+43?
-						}
-					}
-					
-					j++;
-				} // end While j
-				
-				//System.out.println("\nStart Brace: "+startBrace+"\nReturn: "+returnVar+"\nLastBrace: "+lastBrace);
-				
-				
-				if ( countReturns == 1 ) {
-					// If we have more than one return, we'll consider the function as legit 
 
-					k = startBrace;
-					// This while will analyze the function searching for the value of the returning variable.
-					// If this value is obtain by arithmetic operations (at least three operators) the function
-					// will be considered a fake.
-					while ( k<=lastBrace ) {
-						if ( returnVar == null || returnVar.equals("null")) {
-							break;
-						}
-
-
-						Pattern pVal = Pattern.compile(returnVar+" {0,}={1} {0,}(.{1,})[;\\n]");
-						Matcher mVal = pVal.matcher(lines.elementAt(k));
-						if ( mVal.find() ) {
-							//System.out.println( "Operation: "+mVal.group(1) );
-							// The pattern will search for minOperators operators within the return value.
-							// It is obviously possible to integrate pOp within pVal, but due to the complexity 
-							// I preferred to keep them separated. 
-							Pattern pOp = Pattern.compile("(([^\\*\\+\\-\\%]{1,}\\*[^\\*\\+\\-\\%]{0,})"
-															+"|([^\\*\\+\\-\\%]{0,}\\+[^\\*\\+\\-\\%]{0,})"
-															+"|([^\\*\\+\\-\\%]{0,}\\-[^\\*\\+\\-\\%]{0,})"
-															+"|([^\\*\\+\\-\\%]{0,}\\%[^\\*\\+\\-\\%]{0,})){"
-															+minOperators+",}");
-							Matcher mOp = pOp.matcher(mVal.group(1));
-							if ( mOp.find() ) {
-								return true;
-							}
-						}
-						
-						k++;
-					}
 				}
-				countReturns = 0;
-			} // end if function
-		}// end for i
-		
+				
+				Matcher mOp = pOp.matcher(functions.elementAt(i).getReturn().elementAt(0));
+				if ( mOp.find() ) {
+					return true;
+				}
+				
+				
+				
+			}	
+		}
 		
 		return false;
 	}
-	
+		
+		
+		
 		
 	
 }
